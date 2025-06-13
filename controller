@@ -1,0 +1,37 @@
+using Microsoft.AspNetCore.Mvc;
+
+namespace ${data.componentName.replace(/-/g, '_')}.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class ${data.componentName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')}Controller : ControllerBase
+{
+    private readonly ILogger<${data.componentName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')}Controller> _logger;
+
+    public ${data.componentName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')}Controller(ILogger<${data.componentName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')}Controller> logger)
+    {
+        _logger = logger;
+    }
+
+    [HttpGet]
+    public IActionResult Get()
+    {
+        _logger.LogInformation("${data.titulo} - Get method called");
+        return Ok(new { 
+            message = "${data.titulo} is running",
+            timestamp = DateTime.UtcNow,
+            service = "${data.componentName}"
+        });
+    }
+
+    [HttpGet("{id}")]
+    public IActionResult Get(int id)
+    {
+        _logger.LogInformation("${data.titulo} - Get method called with id: {Id}", id);
+        return Ok(new { 
+            id = id,
+            message = $"Item {id} from ${data.titulo}",
+            timestamp = DateTime.UtcNow
+        });
+    }
+}
