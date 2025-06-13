@@ -1,0 +1,304 @@
+{
+  "name": "Creación Automática Componente .NET Core API",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "create-component",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "create-component-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "validation-producto",
+              "leftValue": "={{ $json.producto }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "id": "validation-proyecto",
+              "leftValue": "={{ $json.proyecto }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "id": "validation-equipo",
+              "leftValue": "={{ $json.equipoDueno }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "id": "validation-lider",
+              "leftValue": "={{ $json.liderTecnico }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "id": "validation-tipo",
+              "leftValue": "={{ $json.tipo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "id": "validation-nombre",
+              "leftValue": "={{ $json.nombre }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "validate-input",
+      "name": "Validar Entrada",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Procesar y formatear los datos de entrada\nconst inputData = $input.first().json;\n\n// Generar nombres consistentes\nconst componentName = inputData.nombre.toLowerCase().replace(/[^a-z0-9]/g, '-');\nconst repoName = `${inputData.producto.toLowerCase()}-${componentName}`;\nconst projectKey = `${inputData.producto.toUpperCase()}_${componentName.toUpperCase().replace(/-/g, '_')}`;\n\n// Crear estructura de datos procesada\nconst processedData = {\n  // Datos originales\n  producto: inputData.producto,\n  proyecto: inputData.proyecto,\n  equipoDueno: inputData.equipoDueno,\n  liderTecnico: inputData.liderTecnico,\n  tipo: inputData.tipo,\n  nombre: inputData.nombre,\n  titulo: inputData.titulo || inputData.nombre,\n  descripcion: inputData.descripcion || `Componente ${inputData.nombre} para ${inputData.producto}`,\n  \n  // Datos procesados\n  componentName: componentName,\n  repoName: repoName,\n  projectKey: projectKey,\n  \n  // URLs y paths\n  repoUrl: `https://git.empresa.com/${inputData.producto.toLowerCase()}/${repoName}`,\n  sonarProjectName: `${inputData.producto} - ${inputData.nombre}`,\n  argoAppName: `${inputData.producto.toLowerCase()}-${componentName}`,\n  \n  // Configuración de ambientes\n  environments: {\n    dev: {\n      name: 'development',\n      namespace: `${inputData.producto.toLowerCase()}-dev`,\n      replicas: 1,\n      resources: {\n        requests: { cpu: '100m', memory: '128Mi' },\n        limits: { cpu: '500m', memory: '512Mi' }\n      }\n    },\n    qa: {\n      name: 'qa',\n      namespace: `${inputData.producto.toLowerCase()}-qa`,\n      replicas: 2,\n      resources: {\n        requests: { cpu: '200m', memory: '256Mi' },\n        limits: { cpu: '1000m', memory: '1Gi' }\n      }\n    },\n    prod: {\n      name: 'production',\n      namespace: `${inputData.producto.toLowerCase()}-prod`,\n      replicas: 3,\n      resources: {\n        requests: { cpu: '500m', memory: '512Mi' },\n        limits: { cpu: '2000m', memory: '2Gi' }\n      }\n    }\n  },\n  \n  // Timestamp para tracking\n  createdAt: new Date().toISOString(),\n  createdBy: inputData.liderTecnico\n};\n\nreturn { json: processedData };"
+      },
+      "id": "process-data",
+      "name": "Procesar Datos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.GIT_API_URL }}/projects",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gitlabApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $json.repoName }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json.descripcion }}"
+            },
+            {
+              "name": "namespace_id",
+              "value": "={{ $env.GIT_NAMESPACE_ID }}"
+            },
+            {
+              "name": "visibility",
+              "value": "private"
+            },
+            {
+              "name": "initialize_with_readme",
+              "value": true
+            },
+            {
+              "name": "default_branch",
+              "value": "main"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-git-repo",
+      "name": "Crear Repositorio Git",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generar estructura del proyecto .NET Core API\nconst data = $input.first().json;\n\n// Dockerfile\nconst dockerfile = `FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base\nWORKDIR /app\nEXPOSE 8080\n\nFROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /src\nCOPY [\"${data.componentName}.csproj\", \"./\"]\nRUN dotnet restore \"${data.componentName}.csproj\"\nCOPY . .\nRUN dotnet build \"${data.componentName}.csproj\" -c Release -o /app/build\n\nFROM build AS publish\nRUN dotnet publish \"${data.componentName}.csproj\" -c Release -o /app/publish\n\nFROM base AS final\nWORKDIR /app\nCOPY --from=publish /app/publish .\nENTRYPOINT [\"dotnet\", \"${data.componentName}.dll\"]`;\n\n// .gitignore\nconst gitignore = `## Ignore Visual Studio temporary files, build results, and\n## files generated by popular Visual Studio add-ons.\n\n# User-specific files\n*.rsuser\n*.suo\n*.user\n*.userosscache\n*.sln.docstates\n\n# Build results\n[Dd]ebug/\n[Dd]ebugPublic/\n[Rr]elease/\n[Rr]eleases/\nx64/\nx86/\n[Ww][Ii][Nn]32/\n[Aa][Rr][Mm]/\n[Aa][Rr][Mm]64/\nbld/\n[Bb]in/\n[Oo]bj/\n[Ll]og/\n[Ll]ogs/\n\n# NuGet\n*.nupkg\n*.snupkg\n[Pp]ackages/\n\n# Docker\n**/.dockerignore\n**/Dockerfile*\n\n# IDE\n.vscode/\n.idea/\n*.swp\n*.swo\n\n# OS\n.DS_Store\nThumbs.db`;\n\n// Program.cs\nconst programCs = `using Microsoft.AspNetCore.Mvc;\nusing System.Reflection;\n\nvar builder = WebApplication.CreateBuilder(args);\n\n// Add services\nbuilder.Services.AddControllers();\nbuilder.Services.AddEndpointsApiExplorer();\nbuilder.Services.AddSwaggerGen(c =>\n{\n    c.SwaggerDoc(\"v1\", new() { \n        Title = \"${data.titulo}\", \n        Version = \"v1\",\n        Description = \"${data.descripcion}\"\n    });\n});\n\n// Add health checks\nbuilder.Services.AddHealthChecks();\n\n// Add CORS\nbuilder.Services.AddCors(options =>\n{\n    options.AddPolicy(\"AllowAll\", policy =>\n    {\n        policy.AllowAnyOrigin()\n              .AllowAnyMethod()\n              .AllowAnyHeader();\n    });\n});\n\nvar app = builder.Build();\n\n// Configure pipeline\nif (app.Environment.IsDevelopment())\n{\n    app.UseSwagger();\n    app.UseSwaggerUI();\n}\n\napp.UseCors(\"AllowAll\");\napp.UseAuthorization();\napp.MapControllers();\n\n// Health check endpoint\napp.MapHealthChecks(\"/health\");\n\n// Info endpoint\napp.MapGet(\"/info\", () => new {\n    Service = \"${data.titulo}\",\n    Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(),\n    Environment = app.Environment.EnvironmentName,\n    Timestamp = DateTime.UtcNow\n});\n\napp.Run();`;\n\n// .csproj file\nconst csproj = `<Project Sdk=\"Microsoft.NET.Sdk.Web\">\n\n  <PropertyGroup>\n    <TargetFramework>net8.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <ImplicitUsings>enable</ImplicitUsings>\n    <AssemblyName>${data.componentName}</AssemblyName>\n    <RootNamespace>${data.componentName.replace(/-/g, '_')}</RootNamespace>\n  </PropertyGroup>\n\n  <ItemGroup>\n    <PackageReference Include=\"Microsoft.AspNetCore.OpenApi\" Version=\"8.0.0\" />\n    <PackageReference Include=\"Swashbuckle.AspNetCore\" Version=\"6.5.0\" />\n    <PackageReference Include=\"Microsoft.Extensions.Diagnostics.HealthChecks\" Version=\"8.0.0\" />\n  </ItemGroup>\n\n</Project>`;\n\n// Controller example\nconst controller = `using Microsoft.AspNetCore.Mvc;\n\nnamespace ${data.componentName.replace(/-/g, '_')}.Controllers;\n\n[ApiController]\n[Route(\"api/[controller]\")]\npublic class ${data.componentName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')}Controller : ControllerBase\n{\n    private readonly ILogger<${data.componentName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')}Controller> _logger;\n\n    public ${data.componentName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')}Controller(ILogger<${data.componentName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')}Controller> logger)\n    {\n        _logger = logger;\n    }\n\n    [HttpGet]\n    public IActionResult Get()\n    {\n        _logger.LogInformation(\"${data.titulo} - Get method called\");\n        return Ok(new { \n            message = \"${data.titulo} is running\",\n            timestamp = DateTime.UtcNow,\n            service = \"${data.componentName}\"\n        });\n    }\n\n    [HttpGet(\"{id}\")]\n    public IActionResult Get(int id)\n    {\n        _logger.LogInformation(\"${data.titulo} - Get method called with id: {Id}\", id);\n        return Ok(new { \n            id = id,\n            message = $\"Item {id} from ${data.titulo}\",\n            timestamp = DateTime.UtcNow\n        });\n    }\n}`;\n\n// CI/CD Pipeline (.gitlab-ci.yml)\nconst gitlabCi = `stages:\n  - build\n  - test\n  - security\n  - package\n  - deploy-dev\n  - deploy-qa\n  - deploy-prod\n\nvariables:\n  DOCKER_IMAGE: \\$CI_REGISTRY_IMAGE\n  SONAR_PROJECT_KEY: \"${data.projectKey}\"\n  COMPONENT_NAME: \"${data.componentName}\"\n\n# Build stage\nbuild:\n  stage: build\n  image: mcr.microsoft.com/dotnet/sdk:8.0\n  script:\n    - dotnet restore\n    - dotnet build --configuration Release --no-restore\n  artifacts:\n    paths:\n      - bin/\n      - obj/\n    expire_in: 1 hour\n\n# Test stage\ntest:\n  stage: test\n  image: mcr.microsoft.com/dotnet/sdk:8.0\n  script:\n    - dotnet test --configuration Release --no-build --verbosity normal --collect:\"XPlat Code Coverage\"\n  artifacts:\n    reports:\n      coverage_report:\n        coverage_format: cobertura\n        path: \"**/coverage.cobertura.xml\"\n    expire_in: 1 hour\n  coverage: '/Total\\s*\\|\\s*(\\d+(?:\\.\\d+)?)%/'\n\n# SonarQube analysis\nsonarqube:\n  stage: security\n  image: sonarsource/sonar-scanner-cli:latest\n  variables:\n    SONAR_USER_HOME: \"\\${CI_PROJECT_DIR}/.sonar\"\n    GIT_DEPTH: \"0\"\n  cache:\n    key: \"\\${CI_JOB_NAME}\"\n    paths:\n      - .sonar/cache\n  script:\n    - sonar-scanner\n      -Dsonar.projectKey=\\$SONAR_PROJECT_KEY\n      -Dsonar.sources=.\n      -Dsonar.host.url=\\$SONAR_HOST_URL\n      -Dsonar.login=\\$SONAR_TOKEN\n      -Dsonar.cs.opencover.reportsPaths=\"**/coverage.opencover.xml\"\n  only:\n    - main\n    - develop\n\n# Docker build and push\npackage:\n  stage: package\n  image: docker:24.0.5\n  services:\n    - docker:24.0.5-dind\n  before_script:\n    - echo \\$CI_REGISTRY_PASSWORD | docker login -u \\$CI_REGISTRY_USER --password-stdin \\$CI_REGISTRY\n  script:\n    - docker build -t \\$DOCKER_IMAGE:\\$CI_COMMIT_SHA -t \\$DOCKER_IMAGE:latest .\n    - docker push \\$DOCKER_IMAGE:\\$CI_COMMIT_SHA\n    - docker push \\$DOCKER_IMAGE:latest\n  only:\n    - main\n    - develop\n\n# Deploy to Development\ndeploy-dev:\n  stage: deploy-dev\n  image: argoproj/argocd:v2.8.0\n  script:\n    - argocd app sync \\${COMPONENT_NAME}-dev --auth-token \\$ARGOCD_TOKEN --server \\$ARGOCD_SERVER\n  environment:\n    name: development\n    url: https://\\${COMPONENT_NAME}-dev.\\$DEV_DOMAIN\n  only:\n    - develop\n\n# Deploy to QA\ndeploy-qa:\n  stage: deploy-qa\n  image: argoproj/argocd:v2.8.0\n  script:\n    - argocd app sync \\${COMPONENT_NAME}-qa --auth-token \\$ARGOCD_TOKEN --server \\$ARGOCD_SERVER\n  environment:\n    name: qa\n    url: https://\\${COMPONENT_NAME}-qa.\\$QA_DOMAIN\n  when: manual\n  only:\n    - main\n\n# Deploy to Production\ndeploy-prod:\n  stage: deploy-prod\n  image: argoproj/argocd:v2.8.0\n  script:\n    - argocd app sync \\${COMPONENT_NAME}-prod --auth-token \\$ARGOCD_TOKEN --server \\$ARGOCD_SERVER\n  environment:\n    name: production\n    url: https://\\${COMPONENT_NAME}.\\$PROD_DOMAIN\n  when: manual\n  only:\n    - main`;\n\n// README.md\nconst readme = `# ${data.titulo}\n\n${data.descripcion}\n\n## Información del Proyecto\n\n- **Producto**: ${data.producto}\n- **Proyecto**: ${data.proyecto}\n- **Equipo Dueño**: ${data.equipoDueno}\n- **Líder Técnico**: ${data.liderTecnico}\n- **Tipo**: ${data.tipo}\n\n## Tecnologías\n\n- .NET 8.0\n- ASP.NET Core Web API\n- Swagger/OpenAPI\n- Docker\n- Kubernetes\n\n## Desarrollo Local\n\n### Prerrequisitos\n\n- .NET 8.0 SDK\n- Docker (opcional)\n\n### Ejecutar localmente\n\n\\`\\`\\`bash\n# Restaurar dependencias\ndotnet restore\n\n# Ejecutar la aplicación\ndotnet run\n\\`\\`\\`\n\nLa API estará disponible en: https://localhost:5001\n\n### Swagger UI\n\nAccede a la documentación interactiva en: https://localhost:5001/swagger\n\n### Endpoints principales\n\n- \\`GET /health\\` - Health check\n- \\`GET /info\\` - Información del servicio\n- \\`GET /api/${data.componentName}\\` - Endpoint principal\n\n## Docker\n\n### Construir imagen\n\n\\`\\`\\`bash\ndocker build -t ${data.componentName} .\n\\`\\`\\`\n\n### Ejecutar contenedor\n\n\\`\\`\\`bash\ndocker run -p 8080:8080 ${data.componentName}\n\\`\\`\\`\n\n## Despliegue\n\nEl proyecto utiliza GitLab CI/CD con ArgoCD para despliegues automatizados:\n\n- **Development**: Despliegue automático desde rama \\`develop\\`\n- **QA**: Despliegue manual desde rama \\`main\\`\n- **Production**: Despliegue manual desde rama \\`main\\`\n\n## Monitoreo\n\n- **SonarQube**: Análisis de calidad de código\n- **Health Checks**: Endpoint \\`/health\\` para monitoreo\n- **Logging**: Structured logging con .NET logging\n\n## Contribuir\n\n1. Crear una rama desde \\`develop\\`\n2. Realizar cambios\n3. Crear Pull Request\n4. Esperar revisión del equipo\n\n## Contacto\n\n- **Equipo**: ${data.equipoDueno}\n- **Líder Técnico**: ${data.liderTecnico}\n`;\n\nreturn {\n  json: {\n    ...data,\n    projectFiles: {\n      'Dockerfile': dockerfile,\n      '.gitignore': gitignore,\n      'Program.cs': programCs,\n      [`${data.componentName}.csproj`]: csproj,\n      [`Controllers/${data.componentName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')}Controller.cs`]: controller,\n      '.gitlab-ci.yml': gitlabCi,\n      'README.md': readme\n    }\n  }\n};"
+      },
+      "id": "generate-project-structure",
+      "name": "Generar Estructura del Proyecto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-files",
+      "name": "Dividir Archivos",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Iterar sobre cada archivo del proyecto\nconst data = $input.first().json;\nconst files = [];\n\nfor (const [filePath, content] of Object.entries(data.projectFiles)) {\n  files.push({\n    path: filePath,\n    content: content,\n    repoId: data.repoId || $('create-git-repo').first().json.id,\n    componentName: data.componentName,\n    action: 'create'\n  });\n}\n\nreturn files.map(file => ({ json: file }));"
+      },
+      "id": "prepare-files",
+      "name": "Preparar Archivos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.GIT_API_URL }}/projects/{{ $json.repoId }}/repository/files/{{ encodeURIComponent($json.path) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gitlabApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "branch",
+              "value": "main"
+            },
+            {
+              "name": "content",
+              "value": "={{ Buffer.from($json.content).toString('base64') }}"
+            },
+            {
+              "name": "commit_message",
+              "value": "feat: add {{ $json.path }}"
+            },
+            {
+              "name": "encoding",
+              "value": "base64"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "commit-files",
+      "name": "Commit Archivos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SONAR_API_URL }}/projects/create",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "sonarQubeApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "project",
+              "value": "={{ $('process-data').first().json.projectKey }}"
+            },
+            {
+              "name": "name",
+              "value": "={{ $('process-data').first().json.sonarProjectName }}"
+            },
+            {
+              "name": "visibility",
+              "value": "private"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-sonar-project",
+      "name": "Crear Proyecto SonarQube",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SONAR_API_URL }}/qualitygates/select",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "sonarQubeApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "projectKey",
+              "value": "={{ $('process-data').first().json.projectKey }}"
+            },
+            {
+              "name": "gateName",
+              "value": "Sonar way"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "configure-quality-gate",
+      "name": "Configurar Quality Gate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2220, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generar configuraciones de ArgoCD para los 3 ambientes\nconst data = $('process-data').first().json;\nconst environments = ['dev', 'qa', 'prod'];\nconst argoApps = [];\n\nenvironments.forEach(env => {\n  const envConfig = data.environments[env];\n  \n  const argoApplication = {\n    apiVersion: 'argoproj.io/v1alpha1',\n    kind: 'Application',\n    metadata: {\n      name: `${data.argoAppName}-${env}`,\n      namespace: 'argocd',\n      labels: {\n        'app.kubernetes.io/name': data.componentName,\n        'app.kubernetes.io/component': 'api',\n        'app.kubernetes.io/part-of': data.producto.toLowerCase(),\n        'app.kubernetes.io/managed-by': 'argocd',\n        environment: env\n      },\n      annotations: {\n        'argocd.argoproj.io/sync-wave': '1'\n      }\n    },\n    spec: {\n      project: 'default',\n      source: {\n        repoURL: data.repoUrl,\n        targetRevision: env === 'prod' ? 'main' : 'develop',\n        path: 'k8s',\n        helm: {\n          valueFiles: [`values-${env}.yaml`],\n          parameters: [\n            {\n              name: 'image.tag',\n              value: env === 'prod' ? 'latest' : 'develop'\n            },\n            {\n              name: 'replicaCount',\n              value: envConfig.replicas.toString()\n            }\n          ]\n        }\n      },\n      destination: {\n        server: 'https://kubernetes.default.svc',\n        namespace: envConfig.namespace\n      },\n      syncPolicy: {\n        automated: {\n          prune: true,\n          selfHeal: true,\n          allowEmpty: false\n        },\n        syncOptions: [\n          'CreateNamespace=true',\n          'PrunePropagationPolicy=foreground',\n          'PruneLast=true'\n        ],\n        retry: {\n          limit: 5,\n          backoff: {\n            duration: '5s',\n            factor: 2,\n            maxDuration: '3m'\n          }\n        }\n      },\n      revisionHistoryLimit: 10\n    }\n  };\n  \n  // Helm Chart values para cada ambiente\n  const helmValues = {\n    replicaCount: envConfig.replicas,\n    image: {\n      repository: `registry.empresa.com/${data.producto.toLowerCase()}/${data.componentName}`,\n      pullPolicy: 'Always',\n      tag: env === 'prod' ? 'latest' : 'develop'\n    },\n    nameOverride: data.componentName,\n    fullnameOverride: `${data.componentName}-${env}`,\n    serviceAccount: {\n      create: true,\n      annotations: {},\n      name: ''\n    },\n    podAnnotations
